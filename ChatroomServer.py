@@ -2,6 +2,7 @@ from PodSixNet.Connection import connection
 import PodSixNet.Channel
 import PodSixNet.Server
 from time import sleep
+from Constants import Constants
 class ClientChannel(PodSixNet.Channel.Channel):
 
     def Network(self, data):
@@ -32,6 +33,9 @@ class ClientChannel(PodSixNet.Channel.Channel):
         
     def Network_firstGetUsers(self, data):
         boxesServe.firstSendUsernames()
+        
+    def Network_exit(self, data):
+        boxesServe.exit(data)
         
 class User():
     def __init__(self, channel, addr, username):
@@ -103,9 +107,11 @@ class BoxesServer(PodSixNet.Server.Server):
         channel.Send({"action":"userList","message":usernames})
         
     def passwordRequest(self, username, testPassword):
+        channel = self.findChannel(username)
         if testPassword == password:
-            channel = self.findChannel(username)
-            channel.Send({"action":"adminAccept"})
+            channel.Send({"action":"adminAccept","accepted":True})
+        else:
+            channel.Send({"action":"adminAccept","accepted":False})
             
     def changeUsername(self, oldUsername, newUsername):
         user = self.findUser(oldUsername)
@@ -115,17 +121,25 @@ class BoxesServer(PodSixNet.Server.Server):
     def firstSendUsernames(self):
         usernames = self.getUsernames()
         self.tempChannel.Send({"action":"userList","message":usernames})
-                
+        
+    def exit(self, data):
+        global users
+        username = data["username"]
+        user = self.findUser(username)
+        index = users.index(user)
+        #print users
+        users = users[:index] + users[index+1:]
+        #print users
                 
 address=raw_input("Start the server on what address (192.168.1.144:8000): ")
 if not address:
-    host, port="192.168.1.144", 8000
+    host, port=Constants.SERVER_INTERNAL_ADDRESS, Constants.SERVER_PORT
 else:
     host, port=address.split(":")
     
 password = raw_input("Please supply a password for admins : ")
 if not password:
-    password = "AA"
+    password = Constants.SERVER_DEFULT_PASSWORD
         
 print "Starting server on host: %s, port:%s" % (host, int(port))
 users = []

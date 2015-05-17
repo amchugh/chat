@@ -3,6 +3,7 @@ from PodSixNet.Connection import ConnectionListener
 import thread
 from time import sleep
 import sys
+from Constants import Constants
 
 silence = []
 admin = False
@@ -58,7 +59,11 @@ class MyNetworkListener(ConnectionListener):
             
     def Network_adminAccept(self, data):
         global admin
-        admin = True
+        if data["accepted"]:
+            admin = True
+            print "HELP : You are now an Admin!"
+        else:
+            print "HELP : Incorrect password"
         
     def Network_newUsername(self, data):
         global username
@@ -100,19 +105,26 @@ def newUsername(newUsername):
         networkListener.Send({"action":"changeUsername","newUsername":newUsername,"oldUsername":username})
     else:
         print "HELP : " + newUsername + " is an invalid username."
+        
+def adminStatus():
+    if admin:
+        print "HELP : You are an Admin."
+    else:
+        print "HELP : You are not an Admin."
     
 def commandManager(input):
     global commands
     global commandNames
+    global exitTimer
     if input[0] == "/":
         # These commands don't take any arguments
         
         if input == "/exit":
-            sys.exit()
+            networkListener.Send({"action":"exit","username":username})
+            print "Exiting..."
+            exitTimer = 10
         elif input == "/list":
             list()
-        elif input == "/n":
-            print
             
         else: #Split the word to get the args
             words = input.split(" ")
@@ -128,7 +140,20 @@ def commandManager(input):
             """
             # All these commands take in 1+ arguments
             
-            if words[0] == "/hug":
+            if words[0] == "/n":
+                if len(words) == 2:
+                    if words[1] == "":
+                        print
+                    else:
+                        try:
+                            for i in range(0,int(words[1])):
+                                print
+                        except:
+                            print "HELP : Please enter a valid number"
+                else:
+                    print
+            
+            elif words[0] == "/hug":
                 if len(words) >= 2:
                     hug(words[1])
                 else:
@@ -174,6 +199,8 @@ def commandManager(input):
                             pass
                         else:
                             print "HELP : /admin give requires a username to give admin status"
+                    elif words[1] == "status":
+                        adminStatus()
                 else:
                     print commands["admin"]
                         
@@ -200,6 +227,8 @@ def usernameCheck(testingUsername):
     return True
         
 def loop():
+    global run
+    global exitTimer
     input = []
     i = 0
     thread.start_new_thread(inputer, (input,))
@@ -219,6 +248,11 @@ def loop():
             i = 0
         else:
             i += 1
+        
+        if exitTimer > 0:
+            exitTimer -= 1
+        elif exitTimer == 0:
+            run = False
         sleep(0.05)
         
 #Start of the program
@@ -226,26 +260,29 @@ userList = []
 ignoreActions = ["post","hug","userList","connected","adminAccept","newUsername"]
 isListing = False
 usernameTest = False
+exitTimer = -1
 
 commands = {
 "silence":"Usage: /silence [username] - Used if you want to block people's messages",
 "desilence":"Usage: /desilence [username] - Used if you want to unblock people's messages",
 "hug":"Usage: /hug [username] - Used to hug people :)",
-"admin":"Usage: /admin [join, give] ... - Used to give or get admin permission",
+"admin":"Usage: /admin [join, give, status] ... - Used to give or get admin permission",
 "username":"Usage: [ADMIN ONLY] /username [New Username] - Used to change your username",
 "help":"Usage: /help OR /help [command] - Used if you want to find out more about something",
-"/n":"Usage: /n - Used to make a new line",
+"/n":"Usage: /n {x} - Used to make {x} new line(s) NOTE: do /n to create one new line",
 "exit":"Usage: /exit - Used to exit the chat",
 "list":"Usage: /list - Used to list everyone in the chat"
 }
 
 commandNames = ["silence","desilence","hug","admin","username","help","/n","exit","list"]
 
-address=raw_input("Address of Server (192.168.1.138:8000): ")
+address=raw_input("Address of Server (67.161.127.21:8000): ")
 if not address:
-    host, port="67.161.127.21", 8000
+    host, port= Constants.SERVER_EXTERNAL_ADDRESS, Constants.SERVER_PORT
 else:
     host, port=address.split(":")
+    
+print host, port
         
 print "Connecting to server on host: %s, port:%s" % (host, int(port))
 networkListener = MyNetworkListener()
@@ -285,7 +322,5 @@ while username == " ":
 
 networkListener.Send({"action":"username","message":str(username)})
 run = True
-sleep(2)
 print "Starting loop"
 loop()
-raw_input("")
